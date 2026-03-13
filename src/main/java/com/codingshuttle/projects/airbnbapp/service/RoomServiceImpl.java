@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -21,6 +22,7 @@ public class RoomServiceImpl implements RoomService {
 
     private final RoomRepository roomRepository;
     private final HotelRepository hotelRepository;
+    private final InventoryService inventoryService;
     private final ModelMapper modelMapper;
 
     @Override
@@ -32,7 +34,11 @@ public class RoomServiceImpl implements RoomService {
         Room room = modelMapper.map(roomDto, Room.class);
         room.setHotel(hotel);
         room = roomRepository.save(room);
-        //        TODO: create inventory as soon as room is created and if hotel is active
+
+        if (hotel.getActive()) {
+            inventoryService.initializeRoomForAYear(room);
+        }
+
         return modelMapper.map(room, RoomDto.class);
     }
 
@@ -58,15 +64,14 @@ public class RoomServiceImpl implements RoomService {
 
     }
 
+    @Transactional
     @Override
     public void deleteRoomById(Long roomId) {
         log.info("Deleting the room with ID: {}", roomId);
-        boolean exists = roomRepository.existsById(roomId);
-        if (!exists) {
-            throw new ResourceNotFoundException("Room with ID: " + roomId + " not found");
-        }
+        Room room = roomRepository
+                .findById(roomId)
+                .orElseThrow(() -> new ResourceNotFoundException("Room with ID: " + roomId + " not found"));
+        inventoryService.deleteFutureInventories(room);
         roomRepository.deleteById(roomId);
-
-//        TODO: Delete all future inventories for this room
     }
 }
