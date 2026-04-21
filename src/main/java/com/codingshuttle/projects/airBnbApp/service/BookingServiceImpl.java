@@ -10,6 +10,7 @@ import com.codingshuttle.projects.airBnbApp.exception.UnAuthorisedException;
 import com.codingshuttle.projects.airBnbApp.repository.*;
 import com.stripe.model.Event;
 import com.stripe.model.checkout.Session;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
@@ -35,6 +36,7 @@ public class BookingServiceImpl implements BookingService{
     private final RoomRepository roomRepository;
     private final InventoryRepository inventoryRepository;
     private final CheckOutService checkOutService;
+    private final EntityManager entityManager;
 
     @Value("${frontend.url}")
     private String frontendUrl;
@@ -55,7 +57,7 @@ public class BookingServiceImpl implements BookingService{
         List<Inventory> inventoryList = inventoryRepository.findAndLockAvailableInventory(room.getId(),
                 bookingRequest.getCheckInDate(), bookingRequest.getCheckOutDate(), bookingRequest.getRoomsCount());
 
-        long daysCount = ChronoUnit.DAYS.between(bookingRequest.getCheckInDate(), bookingRequest.getCheckOutDate())+1;
+        long daysCount = ChronoUnit.DAYS.between(bookingRequest.getCheckInDate(), bookingRequest.getCheckOutDate());
 
         if (inventoryList.size() != daysCount) {
             throw new IllegalStateException("Room is not available anymore");
@@ -149,28 +151,47 @@ public class BookingServiceImpl implements BookingService{
     @Override
     @Transactional
     public void capturePayment(Event event) {
-        if ("checkout.session.completed".equals(event.getType())) {
-            Session session = (Session) event.getDataObjectDeserializer().getObject().orElse(null);
-            if (session == null) return;
-
-            String sessionId = session.getId();
-            Booking booking = bookingRepository.findByPaymentSessionId(sessionId).orElseThrow(() ->
-                    new ResourceNotFoundException("Booking not found for session ID: "+sessionId));
-
-            booking.setBookingStatus(BookingStatus.CONFIRMED);
-            bookingRepository.save(booking);
-
-            inventoryRepository.findAndLockReservedInventory(booking.getRoom().getId(), booking.getCheckInDate(),
-                    booking.getCheckOutDate(), booking.getRoomsCount());
-
-            inventoryRepository.confirmBooking(booking.getRoom().getId(), booking.getCheckInDate(),
-                    booking.getCheckOutDate(), booking.getRoomsCount());
-
-            log.info("Successfully confirmed the booking for Booking ID: {}", booking.getId());
-
-        } else {
+        if (!"checkout.session.completed".equals(event.getType())) {
             log.warn("Unhandled event type: {}", event.getType());
+            return;
         }
+
+        // Use deserializeUnsafe to avoid API version mismatch issues with getObject()
+        Session session;
+        try {
+            session = (Session) event.getDataObjectDeserializer().deserializeUnsafe();
+        } catch (Exception e) {
+            log.error("Failed to deserialize session from event: {}", event.getId(), e);
+            return;
+        }
+
+        if (session == null) {
+            log.warn("Could not deserialize session from event: {}", event.getId());
+            return;
+        }
+
+        String sessionId = session.getId();
+        log.info("Processing checkout.session.completed for sessionId: {}", sessionId);
+
+        Booking booking = bookingRepository.findByPaymentSessionId(sessionId).orElse(null);
+        if (booking == null) {
+            log.warn("No booking found for sessionId: {} - likely an old/unrelated event, ignoring", sessionId);
+            return;
+        }
+
+        if (booking.getBookingStatus() == BookingStatus.CONFIRMED) {
+            log.info("Booking {} already confirmed, skipping duplicate webhook", booking.getId());
+            return;
+        }
+
+        booking.setBookingStatus(BookingStatus.CONFIRMED);
+        bookingRepository.save(booking);
+        entityManager.flush();
+
+        inventoryRepository.confirmBooking(booking.getRoom().getId(), booking.getCheckInDate(),
+                booking.getCheckOutDate(), booking.getRoomsCount());
+
+        log.info("Successfully confirmed the booking for Booking ID: {}", booking.getId());
     }
 
     public boolean hasBookingExpired(Booking booking) {
