@@ -21,7 +21,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -57,6 +56,10 @@ public class BookingServiceImpl implements BookingService{
     @Override
     @Transactional
     public BookingDto initialiseBooking(BookingRequest bookingRequest) {
+
+        if (!bookingRequest.getCheckOutDate().isAfter(bookingRequest.getCheckInDate())) {
+            throw new IllegalStateException("Check-out date must be after check-in date");
+        }
 
         log.info("Initialising booking for hotel : {}, room: {}, date {}-{}", bookingRequest.getHotelId(),
                 bookingRequest.getRoomId(), bookingRequest.getCheckInDate(), bookingRequest.getCheckOutDate());
@@ -202,33 +205,74 @@ public class BookingServiceImpl implements BookingService{
     @Transactional
     public void cancelBooking(Long bookingId) {
         Booking booking = bookingRepository.findById(bookingId).orElseThrow(
-                () -> new ResourceNotFoundException("Booking not found with id: "+bookingId)
+                () -> new ResourceNotFoundException("Booking not found with id: " + bookingId)
         );
+
         User user = getCurrentUser();
         if (!user.equals(booking.getUser())) {
-            throw new UnAuthorisedException("Booking does not belong to this user with id: "+user.getId());
+            throw new UnAuthorisedException("Booking does not belong to this user with id: " + user.getId());
         }
 
-        if(booking.getBookingStatus() != BookingStatus.CONFIRMED) {
-            throw new IllegalStateException("Only confirmed bookings can be cancelled");
+        switch (booking.getBookingStatus()) {
+
+            case RESERVED, GUESTS_ADDED -> {
+                inventoryRepository.releaseReservedInventory(
+                        booking.getRoom().getId(),
+                        booking.getCheckInDate(),
+                        booking.getCheckOutDate(),
+                        booking.getRoomsCount()
+                );
+                booking.setBookingStatus(BookingStatus.CANCELLED);
+                bookingRepository.save(booking);
+            }
+
+            case PAYMENTS_PENDING -> {
+                try {
+                    Session session = Session.retrieve(booking.getPaymentSessionId());
+                    session.expire();
+                } catch (StripeException e) {
+                    log.warn("Could not expire Stripe session for booking: {}, reason: {}",
+                            bookingId, e.getMessage());
+                }
+                inventoryRepository.releaseReservedInventory(
+                        booking.getRoom().getId(),
+                        booking.getCheckInDate(),
+                        booking.getCheckOutDate(),
+                        booking.getRoomsCount()
+                );
+                booking.setBookingStatus(BookingStatus.CANCELLED);
+                bookingRepository.save(booking);
+            }
+
+            case CONFIRMED -> {
+                inventoryRepository.cancelBooking(
+                        booking.getRoom().getId(),
+                        booking.getCheckInDate(),
+                        booking.getCheckOutDate(),
+                        booking.getRoomsCount()
+                );
+                booking.setBookingStatus(BookingStatus.CANCELLED);
+                bookingRepository.save(booking);
+                entityManager.flush();
+
+                try {
+                    Session session = Session.retrieve(booking.getPaymentSessionId());
+                    RefundCreateParams refundParams = RefundCreateParams.builder()
+                            .setPaymentIntent(session.getPaymentIntent())
+                            .build();
+                    Refund.create(refundParams);
+                } catch (StripeException e) {
+                    throw new RuntimeException("Cancellation succeeded but refund failed " +
+                            "for booking: " + bookingId, e);
+                }
+            }
+
+            default -> throw new IllegalStateException(
+                    "Booking with status " + booking.getBookingStatus() + " cannot be cancelled"
+            );
         }
 
-        booking.setBookingStatus(BookingStatus.CANCELLED);
-        bookingRepository.save(booking);
-        entityManager.flush();
-
-        inventoryRepository.cancelBooking(booking.getRoom().getId(), booking.getCheckInDate(),
-                booking.getCheckOutDate(), booking.getRoomsCount());
-
-        try {
-            Session session = Session.retrieve(booking.getPaymentSessionId());
-            RefundCreateParams refundParams = RefundCreateParams.builder()
-                    .setPaymentIntent(session.getPaymentIntent())
-                    .build();
-            Refund.create(refundParams);
-        } catch (StripeException e) {
-            throw new RuntimeException(e);
-        }
+        log.info("Booking ID: {} cancelled successfully", bookingId);
     }
 
     @Override

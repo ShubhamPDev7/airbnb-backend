@@ -4,6 +4,7 @@ import com.codingshuttle.projects.airBnbApp.dto.BookingDto;
 import com.codingshuttle.projects.airBnbApp.dto.BookingRequest;
 import com.codingshuttle.projects.airBnbApp.dto.GuestDto;
 import com.codingshuttle.projects.airBnbApp.service.BookingService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,7 +20,7 @@ public class HotelBookingController {
     private final BookingService bookingService;
 
     @PostMapping("/init")
-    public ResponseEntity<BookingDto> initializeBooking(@RequestBody BookingRequest bookingRequest) {
+    public ResponseEntity<BookingDto> initializeBooking(@Valid @RequestBody BookingRequest bookingRequest) {
         return ResponseEntity.ok(bookingService.initialiseBooking(bookingRequest));
     }
 

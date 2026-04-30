@@ -5,10 +5,13 @@ import io.jsonwebtoken.JwtException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.nio.file.AccessDeniedException;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -54,6 +57,32 @@ public class GlobalExceptionHandler {
         ApiError apiError = ApiError.builder()
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .message(exception.getMessage())
+                .build();
+        return buildErrorResponseEntity(apiError);
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ApiResponse<?>> handleValidationErrors(MethodArgumentNotValidException ex) {
+        List<String> errors = ex.getBindingResult()
+                .getFieldErrors()
+                .stream()
+                .map(fieldError -> fieldError.getField() + ": " + fieldError.getDefaultMessage())
+                .collect(Collectors.toList());
+
+        ApiError apiError = ApiError.builder()
+                .status(HttpStatus.BAD_REQUEST)
+                .message("Input validation failed")
+                .subErrors(errors)
+                .build();
+
+        return buildErrorResponseEntity(apiError);
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ApiResponse<?>> handleIllegalStateException(IllegalStateException ex) {
+        ApiError apiError = ApiError.builder()
+                .status(HttpStatus.BAD_REQUEST)
+                .message(ex.getMessage())
                 .build();
         return buildErrorResponseEntity(apiError);
     }

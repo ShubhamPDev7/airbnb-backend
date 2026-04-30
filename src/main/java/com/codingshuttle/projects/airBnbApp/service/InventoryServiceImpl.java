@@ -98,6 +98,11 @@ public class InventoryServiceImpl implements InventoryService{
     @Override
     @Transactional
     public void updateInventory(Long roomId, UpdateInventoryRequestDto updateInventoryRequestDto) {
+
+        if (!updateInventoryRequestDto.getEndDate().isAfter(updateInventoryRequestDto.getStartDate())) {
+            throw new IllegalStateException("End date must be after start date");
+        }
+
         log.info("Updating All inventory by room for room with id: {} between date range: {} - {}", roomId,
                 updateInventoryRequestDto.getStartDate(), updateInventoryRequestDto.getEndDate());
 

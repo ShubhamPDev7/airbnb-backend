@@ -9,6 +9,7 @@ import com.codingshuttle.projects.airBnbApp.service.BookingService;
 import com.codingshuttle.projects.airBnbApp.service.GuestService;
 import com.codingshuttle.projects.airBnbApp.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -27,7 +28,7 @@ public class UserController {
 
     @PatchMapping("/profile")
     @Operation(summary = "Update the user profile", tags = {"Profile"})
-    public ResponseEntity<Void> updateProfile(@RequestBody ProfileUpdateRequestDto profileUpdateRequestDto) {
+    public ResponseEntity<Void> updateProfile(@Valid @RequestBody ProfileUpdateRequestDto profileUpdateRequestDto) {
         userService.updateProfile(profileUpdateRequestDto);
 
         return ResponseEntity.noContent().build();
