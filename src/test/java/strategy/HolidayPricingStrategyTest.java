@@ -1,7 +1,8 @@
-package com.codingshuttle.projects.airBnbApp.strategy;
+package strategy;
 
 import com.codingshuttle.projects.airBnbApp.entity.Inventory;
-import com.codingshuttle.projects.airBnbApp.entity.Room;
+import com.codingshuttle.projects.airBnbApp.strategy.HolidayPricingStrategy;
+import com.codingshuttle.projects.airBnbApp.strategy.PricingStrategy;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -11,8 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class HolidayPricingStrategyTest {
 
-    // create a fake base strategy that always returns 1000
-    // so we can isolate and test ONLY the holiday logic
+
     private final PricingStrategy baseStrategy = inventory -> BigDecimal.valueOf(1000);
 
     private final HolidayPricingStrategy holidayStrategy =
