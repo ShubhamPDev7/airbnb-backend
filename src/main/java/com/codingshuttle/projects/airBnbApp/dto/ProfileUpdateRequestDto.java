@@ -1,14 +1,13 @@
 package com.codingshuttle.projects.airBnbApp.dto;
 
-import com.codingshuttle.projects.airBnbApp.entity.User;
 import com.codingshuttle.projects.airBnbApp.entity.enums.Gender;
 import lombok.Data;
 
+import java.time.LocalDate;
+
 @Data
-public class GuestDto {
-    private Long id;
-    private UserBasicDto user;
+public class ProfileUpdateRequestDto {
     private String name;
+    private LocalDate dateOfBirth;
     private Gender gender;
-    private Integer age;
 }
