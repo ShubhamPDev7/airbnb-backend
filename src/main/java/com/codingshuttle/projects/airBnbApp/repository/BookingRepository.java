@@ -16,6 +16,16 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     Optional<Booking> findByPaymentSessionId(String sessionId);
 
+    @Query("""
+            SELECT b FROM Booking b
+            JOIN FETCH b.hotel
+            JOIN FETCH b.user
+            WHERE b.paymentSessionId = :sessionId
+            """)
+    Optional<Booking> findByPaymentSessionIdWithDetails(
+            @Param("sessionId") String sessionId
+    );
+
     List<Booking> findByHotel(Hotel hotel);
 
     List<Booking> findByHotelAndCreatedAtBetween(Hotel hotel, LocalDateTime startDateTime, LocalDateTime endDateTime);
