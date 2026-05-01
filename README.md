@@ -1,6 +1,6 @@
 # Airbnb Clone — Backend
 
-A full-featured hotel booking backend built with Spring Boot, inspired by Airbnb. Supports hotel management, room inventory, dynamic pricing, Stripe payments, and guest management.
+A full-featured hotel booking backend built with Spring Boot, inspired by Airbnb. Supports hotel management, room inventory, dynamic pricing, Stripe payments, email notifications, and guest management.
 
 ---
 
@@ -10,6 +10,8 @@ A full-featured hotel booking backend built with Spring Boot, inspired by Airbnb
 - **Spring Security** — JWT-based stateless authentication
 - **Spring Data JPA** — PostgreSQL with pessimistic locking
 - **Stripe** — Checkout sessions, webhooks, refunds
+- **Bucket4j** — Token bucket rate limiting
+- **Spring Mail** — Async HTML email notifications
 - **ModelMapper** — DTO mapping
 - **Lombok** — Boilerplate reduction
 - **Springdoc OpenAPI** — Swagger UI (`/swagger-ui.html`)
@@ -41,6 +43,11 @@ A full-featured hotel booking backend built with Spring Boot, inspired by Airbnb
 4. **Webhook** — Stripe confirms payment, booking marked `CONFIRMED`
 5. **Cancel** — auto-refund via Stripe, inventory released
 
+### Booking Expiry
+- Scheduled job runs every 10 minutes
+- Automatically expires `RESERVED` bookings older than 10 minutes
+- Releases inventory back when booking expires
+
 ### Dynamic Pricing (Decorator Pattern)
 Pricing strategies applied in chain:
 - **Base** — room base price × surge factor
@@ -48,6 +55,18 @@ Pricing strategies applied in chain:
 - **Occupancy** — +20% if occupancy > 80%
 - **Urgency** — higher price as check-in date approaches
 - **Holiday** — premium on public holidays
+
+### Email Notifications
+- Booking confirmation email with hotel name, dates, rooms and amount
+- Booking cancellation email with refund details
+- Async sending — does not block the booking flow
+- HTML formatted emails
+
+### Rate Limiting
+- Per-IP rate limiting on the hotel search endpoint
+- 20 requests per minute using Bucket4j token bucket algorithm
+- Returns `429 Too Many Requests` when limit exceeded
+- Protects against scraping and abuse
 
 ### Guest Management (User)
 - Add, update, delete personal guest profiles
@@ -99,8 +118,7 @@ Pricing strategies applied in chain:
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/search` | Search hotels by city & dates |
-| GET | `/{hotelId}` | Get hotel info |
-| GET | `/{hotelId}/rooms/{roomId}` | Get room info |
+| GET | `/{hotelId}/info` | Get hotel info |
 
 ### Bookings — `/api/v1/bookings`
 | Method | Endpoint | Description |
@@ -131,6 +149,7 @@ Pricing strategies applied in chain:
 - PostgreSQL
 - Maven
 - Stripe account (for payments)
+- Gmail account (for email notifications)
 
 ### Setup
 
@@ -154,7 +173,14 @@ stripe.secretKey=your_stripe_secret_key
 stripe.webhookSecret=your_stripe_webhook_secret
 
 frontend.url=http://localhost:3000
+
+spring.mail.host=smtp.gmail.com
+spring.mail.port=587
+spring.mail.username=your_email@gmail.com
+spring.mail.password=your_app_password
 ```
+
+> **Note:** For Gmail, use an App Password (not your regular password). Enable 2FA on your Google account, then generate an App Password at myaccount.google.com/apppasswords
 
 3. **Run the app**
 ```bash
@@ -172,14 +198,14 @@ Navigate to `http://localhost:8080/api/v1/swagger-ui.html`
 ```
 src/main/java/com/codingshuttle/projects/airBnbApp/
 ├── advice/          # Global exception handler & response wrapper
-├── config/          # ModelMapper, Stripe config
+├── config/          # ModelMapper, Stripe, rate limiting config
 ├── controller/      # REST controllers
 ├── dto/             # Request/Response DTOs
 ├── entity/          # JPA entities
 ├── exception/       # Custom exceptions
 ├── repository/      # Spring Data JPA repositories
 ├── security/        # JWT filter, auth service, security config
-├── service/         # Business logic
+├── service/         # Business logic + email + booking expiry job
 ├── strategy/        # Dynamic pricing strategies
 └── util/            # AppUtils (getCurrentUser)
 ```
@@ -193,6 +219,7 @@ src/main/java/com/codingshuttle/projects/airBnbApp/
 - Passwords hashed with BCrypt
 - Role-based endpoint protection (`HOTEL_MANAGER` for admin routes)
 - Ownership checks on all hotel, booking and guest operations
+- Rate limiting on public search endpoint (20 req/min per IP)
 
 ---
 
