@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -37,6 +38,7 @@ public class WebSecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
 
         httpSecurity
+                .cors(Customizer.withDefaults())
                 .csrf(csrfConfig -> csrfConfig.disable())
                 .sessionManagement(sessionConfig -> sessionConfig.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
@@ -44,6 +46,7 @@ public class WebSecurityConfig {
                         .requestMatchers("/admin/**").hasAnyRole("HOTEL_MANAGER")
                         .requestMatchers("/bookings/**").authenticated()
                         .requestMatchers("/users/**").authenticated()
+                        .requestMatchers("/hotels/search", "/hotels/**").permitAll()
                         .anyRequest().permitAll()
                 )
                 .exceptionHandling(exHandlingConfig -> exHandlingConfig.accessDeniedHandler(accessDeniedHandler()));
@@ -55,13 +58,14 @@ public class WebSecurityConfig {
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
+
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
     }
 
     @Bean
-    public AccessDeniedHandler  accessDeniedHandler() {
+    public AccessDeniedHandler accessDeniedHandler() {
         return (request, response, accessDeniedException) -> {
             handlerExceptionResolver.resolveException(request, response, null, accessDeniedException);
         };

@@ -27,6 +27,7 @@ public class Inventory {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "hotel_id",  nullable = false)
+    @org.hibernate.annotations.OnDelete(action = org.hibernate.annotations.OnDeleteAction.CASCADE)
     private Hotel hotel;
 
     @ManyToOne(fetch = FetchType.LAZY)

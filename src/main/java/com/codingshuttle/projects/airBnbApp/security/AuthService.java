@@ -1,6 +1,7 @@
 package com.codingshuttle.projects.airBnbApp.security;
 
 import com.codingshuttle.projects.airBnbApp.dto.LoginDto;
+import com.codingshuttle.projects.airBnbApp.dto.LoginResponseDto;
 import com.codingshuttle.projects.airBnbApp.dto.SignUpRequestDto;
 import com.codingshuttle.projects.airBnbApp.dto.UserDto;
 import com.codingshuttle.projects.airBnbApp.entity.User;
@@ -44,17 +45,15 @@ public class AuthService {
         return modelMapper.map(newUser, UserDto.class);
     }
 
-    public String[] login(LoginDto loginDto){
-        Authentication authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(
-                loginDto.getEmail(), loginDto.getPassword()
-        ));
-
+    public LoginResponseDto login(LoginDto loginDto) {
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(loginDto.getEmail(), loginDto.getPassword())
+        );
         User user = (User) authentication.getPrincipal();
-
-        String[] arr = new String[2];
-        arr[0] = jwtService.generateAccessToken(user);
-        arr[1] = jwtService.generateRefreshToken(user);
-        return arr;
+        UserDto userDto = modelMapper.map(user, UserDto.class);
+        String accessToken = jwtService.generateAccessToken(user);
+        String refreshToken = jwtService.generateRefreshToken(user);
+        return new LoginResponseDto(accessToken, userDto);
     }
 
     public String refreshToken(String refreshToken){

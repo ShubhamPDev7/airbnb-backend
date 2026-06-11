@@ -23,6 +23,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 
 @Service
 @RequiredArgsConstructor
@@ -53,6 +55,12 @@ public class PricingUpdateService {
             page++;
         }
     }
+//    @EventListener(ApplicationReadyEvent.class)
+//    public void forceUpdateOnStartup() {
+//        log.info("🚀 Spring Boot is ready! Forcing initial price calculation...");
+//        updatePrices();
+//        log.info("✅ Initial price calculation complete!");
+//    }
 
     private void updateHotelPrices(Hotel hotel) {
         log.info("Updating hotel prices for hotel ID: {}", hotel.getId());
@@ -95,6 +103,10 @@ public class PricingUpdateService {
             inventory.setPrice(dynamicPrice);
         });
         inventoryRepository.saveAll(inventoryList);
+    }
+
+    public void updatePricesForHotel(Hotel hotel) {
+        updateHotelPrices(hotel);
     }
 
 }

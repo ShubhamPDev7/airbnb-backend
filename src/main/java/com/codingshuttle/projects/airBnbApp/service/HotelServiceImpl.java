@@ -8,6 +8,7 @@ import com.codingshuttle.projects.airBnbApp.entity.Room;
 import com.codingshuttle.projects.airBnbApp.entity.User;
 import com.codingshuttle.projects.airBnbApp.exception.ResourceNotFoundException;
 import com.codingshuttle.projects.airBnbApp.exception.UnAuthorisedException;
+import com.codingshuttle.projects.airBnbApp.repository.HotelMinPriceRepository;
 import com.codingshuttle.projects.airBnbApp.repository.HotelRepository;
 import com.codingshuttle.projects.airBnbApp.repository.RoomRepository;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,10 @@ public class HotelServiceImpl implements HotelService{
     private final ModelMapper modelMapper;
     private final InventoryService inventoryService;
     private final RoomRepository roomRepository;
+    private final PricingUpdateService pricingUpdateService;
+
+    // 🌟 INJECT THE REPOSITORY HERE
+    private final HotelMinPriceRepository hotelMinPriceRepository;
 
     @Override
     public HotelDto createNewHotel(HotelDto hotelDto) {
@@ -70,8 +75,11 @@ public class HotelServiceImpl implements HotelService{
         if(!user.equals(hotel.getOwner())) {
             throw new UnAuthorisedException("This user does not own this hotel with id: "+id);
         }
+
+        boolean currentActive = hotel.getActive();
         modelMapper.map(hotelDto, hotel);
         hotel.setId(id);
+        hotel.setActive(currentActive);
         hotel = hotelRepository.save(hotel);
         return modelMapper.map(hotel, HotelDto.class);
     }
@@ -88,10 +96,15 @@ public class HotelServiceImpl implements HotelService{
             throw new UnAuthorisedException("This user does not own this hotel with id: "+id);
         }
 
+        // 🌟 EXPLICITLY DELETE CHILD RECORDS FIRST TO PREVENT POSTGRES CRASH
+        hotelMinPriceRepository.deleteByHotel(hotel);
+
         for(Room room: hotel.getRooms()) {
             inventoryService.deleteAllInventories(room);
             roomRepository.deleteById(room.getId());
         }
+
+        // Now it is safe to delete the hotel itself
         hotelRepository.deleteById(id);
     }
 
@@ -114,6 +127,8 @@ public class HotelServiceImpl implements HotelService{
         for(Room room: hotel.getRooms()) {
             inventoryService.initializeRoomForAYear(room);
         }
+
+        pricingUpdateService.updatePricesForHotel(hotel);
     }
 
     @Override
@@ -141,6 +156,4 @@ public class HotelServiceImpl implements HotelService{
                 .map((element) -> modelMapper.map(element, HotelDto.class))
                 .collect(Collectors.toList());
     }
-
-
 }

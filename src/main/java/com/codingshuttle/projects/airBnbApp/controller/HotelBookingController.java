@@ -46,4 +46,9 @@ public class HotelBookingController {
     public ResponseEntity<Map<String, String>> getBookingStatus(@PathVariable Long bookingId) {
         return ResponseEntity.ok(Map.of("status", bookingService.getBookingStatus(bookingId)));
     }
+
+    @GetMapping("/my")
+    public ResponseEntity<List<BookingDto>> getMyBookings() {
+        return ResponseEntity.ok(bookingService.getMyBookings());
+    }
 }

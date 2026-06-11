@@ -10,6 +10,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 
 @RestController
 @RequestMapping("/hotels")
@@ -19,10 +21,10 @@ public class HotelBrowseController {
     private final InventoryService  inventoryService;
     private final HotelService hotelService;
 
-    @GetMapping("/search")
-    public ResponseEntity<Page<HotelPriceDto>> searchHotels(@RequestBody HotelSearchRequest hotelSearchRequest){
+    @PostMapping("/search")
+    public ResponseEntity<List<HotelPriceDto>> searchHotels(@RequestBody HotelSearchRequest hotelSearchRequest){
         var page = inventoryService.searchHotels(hotelSearchRequest);
-        return ResponseEntity.ok(page);
+        return ResponseEntity.ok(page.getContent());
     }
 
     @GetMapping("/{hotelId}/info")

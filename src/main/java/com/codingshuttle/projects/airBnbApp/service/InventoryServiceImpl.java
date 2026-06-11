@@ -41,14 +41,14 @@ public class InventoryServiceImpl implements InventoryService{
     public void initializeRoomForAYear(Room room) {
         LocalDate today = LocalDate.now();
         LocalDate endDate = today.plusYears(1);
-        for (; !today.isAfter(endDate); today=today.plusDays(1)) {
+        for (LocalDate date = today; !date.isAfter(endDate); date = date.plusDays(1)) {
             Inventory inventory = Inventory.builder()
                     .hotel(room.getHotel())
                     .room(room)
                     .bookedCount(0)
                     .reservedCount(0)
                     .city(room.getHotel().getCity())
-                    .date(today)
+                    .date(date)
                     .price(room.getBasePrice())
                     .surgeFactor(BigDecimal.ONE)
                     .totalCount(room.getTotalCount())
@@ -66,16 +66,30 @@ public class InventoryServiceImpl implements InventoryService{
 
     @Override
     public Page<HotelPriceDto> searchHotels(HotelSearchRequest hotelSearchRequest) {
+        // Normalize city to handle case insensitivity
+        if (hotelSearchRequest.getCity() != null && !hotelSearchRequest.getCity().isEmpty()) {
+            hotelSearchRequest.setCity(
+                    hotelSearchRequest.getCity().substring(0, 1).toUpperCase() +
+                            hotelSearchRequest.getCity().substring(1).toLowerCase()
+            );
+        }
+
         log.info("Searching hotels for {} city, from {} to {}", hotelSearchRequest.getCity(), hotelSearchRequest.getStartDate(), hotelSearchRequest.getEndDate());
+
         Pageable pageable = PageRequest.of(hotelSearchRequest.getPage(), hotelSearchRequest.getSize());
         long dateCount =
                 ChronoUnit.DAYS.between(hotelSearchRequest.getStartDate(), hotelSearchRequest.getEndDate()) + 1;
 
         // business logic - 90 days
         Page<HotelPriceDto> hotelPage =
-                hotelMinPriceRepository.findHotelsWithAvailableInventory(hotelSearchRequest.getCity(),
-                        hotelSearchRequest.getStartDate(), hotelSearchRequest.getEndDate(), hotelSearchRequest.getRoomsCount(),
-                        dateCount, pageable);
+                hotelMinPriceRepository.findHotelsWithAvailableInventory(
+                        hotelSearchRequest.getCity(),
+                        hotelSearchRequest.getStartDate(),
+                        hotelSearchRequest.getEndDate(),
+                        hotelSearchRequest.getRoomsCount(),
+                        dateCount,
+                        pageable
+                );
 
         return hotelPage;
     }
