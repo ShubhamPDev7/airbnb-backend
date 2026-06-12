@@ -19,6 +19,7 @@ public class RoomDto {
     @DecimalMin(value = "0.0", inclusive = false, message = "Base price must be greater than 0")
     private BigDecimal basePrice;
 
+
     private String[] photos;
 
     private String[] amenities;

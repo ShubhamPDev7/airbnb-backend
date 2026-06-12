@@ -14,20 +14,27 @@ import java.util.Optional;
 
 public interface HotelMinPriceRepository extends JpaRepository<HotelMinPrice, Long> {
 
+    // 🌟 UPDATED: Added category matching logic (ILIKE equivalent in JPQL)
     @Query(value = """
         SELECT new com.codingshuttle.projects.airBnbApp.dto.HotelPriceDto(i.hotel, AVG(i.price))
         FROM HotelMinPrice i
-        WHERE (:city = '' OR i.hotel.city = :city)
+        WHERE (:city IS NULL OR :city = '' OR i.hotel.city = :city)
             AND i.date BETWEEN :startDate AND :endDate
             AND i.hotel.active = true
+            AND (:category IS NULL OR :category = '' OR :category = 'all' 
+                 OR LOWER(i.hotel.name) LIKE LOWER(CONCAT('%', REPLACE(:category, 's', ''), '%')) 
+                 OR LOWER(i.hotel.city) LIKE LOWER(CONCAT('%', :category, '%')))
         GROUP BY i.hotel
         """,
             countQuery = """
         SELECT COUNT(DISTINCT i.hotel)
         FROM HotelMinPrice i
-        WHERE (:city = '' OR i.hotel.city = :city)
+        WHERE (:city IS NULL OR :city = '' OR i.hotel.city = :city)
             AND i.date BETWEEN :startDate AND :endDate
             AND i.hotel.active = true
+            AND (:category IS NULL OR :category = '' OR :category = 'all' 
+                 OR LOWER(i.hotel.name) LIKE LOWER(CONCAT('%', REPLACE(:category, 's', ''), '%')) 
+                 OR LOWER(i.hotel.city) LIKE LOWER(CONCAT('%', :category, '%')))
         """)
     Page<HotelPriceDto> findHotelsWithAvailableInventory(
             @Param("city") String city,
@@ -35,6 +42,7 @@ public interface HotelMinPriceRepository extends JpaRepository<HotelMinPrice, Lo
             @Param("endDate") LocalDate endDate,
             @Param("roomsCount") Integer roomsCount,
             @Param("dateCount") Long dateCount,
+            @Param("category") String category, // 🌟 NEW PARAMETER
             Pageable pageable
     );
 

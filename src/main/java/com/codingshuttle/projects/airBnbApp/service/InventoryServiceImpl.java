@@ -64,9 +64,9 @@ public class InventoryServiceImpl implements InventoryService{
         inventoryRepository.deleteByRoom(room);
     }
 
+
     @Override
     public Page<HotelPriceDto> searchHotels(HotelSearchRequest hotelSearchRequest) {
-        // Normalize city to handle case insensitivity
         if (hotelSearchRequest.getCity() != null && !hotelSearchRequest.getCity().isEmpty()) {
             hotelSearchRequest.setCity(
                     hotelSearchRequest.getCity().substring(0, 1).toUpperCase() +
@@ -74,13 +74,14 @@ public class InventoryServiceImpl implements InventoryService{
             );
         }
 
-        log.info("Searching hotels for {} city, from {} to {}", hotelSearchRequest.getCity(), hotelSearchRequest.getStartDate(), hotelSearchRequest.getEndDate());
+        log.info("Searching hotels for {} city, category {}, from {} to {}",
+                hotelSearchRequest.getCity(), hotelSearchRequest.getCategory(), hotelSearchRequest.getStartDate(), hotelSearchRequest.getEndDate());
 
         Pageable pageable = PageRequest.of(hotelSearchRequest.getPage(), hotelSearchRequest.getSize());
         long dateCount =
                 ChronoUnit.DAYS.between(hotelSearchRequest.getStartDate(), hotelSearchRequest.getEndDate()) + 1;
 
-        // business logic - 90 days
+        // 🌟 UPDATED: Pass the category into the repository method
         Page<HotelPriceDto> hotelPage =
                 hotelMinPriceRepository.findHotelsWithAvailableInventory(
                         hotelSearchRequest.getCity(),
@@ -88,6 +89,7 @@ public class InventoryServiceImpl implements InventoryService{
                         hotelSearchRequest.getEndDate(),
                         hotelSearchRequest.getRoomsCount(),
                         dateCount,
+                        hotelSearchRequest.getCategory(),
                         pageable
                 );
 

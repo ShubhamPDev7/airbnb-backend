@@ -12,6 +12,8 @@ public class HotelSearchRequest {
     private LocalDate endDate = LocalDate.now().plusDays(1);
     private Integer roomsCount;
 
+    private String category;
+
     private Integer page=0;
     private Integer size=10;
 }

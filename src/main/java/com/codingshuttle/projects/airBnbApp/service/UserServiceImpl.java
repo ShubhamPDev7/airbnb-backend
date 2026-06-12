@@ -3,15 +3,18 @@ package com.codingshuttle.projects.airBnbApp.service;
 import com.codingshuttle.projects.airBnbApp.dto.ProfileUpdateRequestDto;
 import com.codingshuttle.projects.airBnbApp.dto.UserDto;
 import com.codingshuttle.projects.airBnbApp.entity.User;
+import com.codingshuttle.projects.airBnbApp.entity.enums.Gender;
 import com.codingshuttle.projects.airBnbApp.exception.ResourceNotFoundException;
 import com.codingshuttle.projects.airBnbApp.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import static com.codingshuttle.projects.airBnbApp.util.AppUtils.getCurrentUser;
 
@@ -52,4 +55,5 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
     }
+
 }

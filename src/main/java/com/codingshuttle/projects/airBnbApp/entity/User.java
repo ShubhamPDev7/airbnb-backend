@@ -34,6 +34,9 @@ public class User implements UserDetails {
 
     private String name;
 
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private Boolean isVerified = false;
+
     private LocalDate dateOfBirth;
 
     @Enumerated(EnumType.STRING)

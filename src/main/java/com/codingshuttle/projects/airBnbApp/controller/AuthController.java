@@ -1,9 +1,6 @@
 package com.codingshuttle.projects.airBnbApp.controller;
 
-import com.codingshuttle.projects.airBnbApp.dto.LoginDto;
-import com.codingshuttle.projects.airBnbApp.dto.LoginResponseDto;
-import com.codingshuttle.projects.airBnbApp.dto.SignUpRequestDto;
-import com.codingshuttle.projects.airBnbApp.dto.UserDto;
+import com.codingshuttle.projects.airBnbApp.dto.*;
 import com.codingshuttle.projects.airBnbApp.security.AuthService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -56,4 +53,54 @@ public class AuthController {
 
         return ResponseEntity.ok(new LoginResponseDto(accessToken, null));
     }
+
+    @PostMapping("/google")
+    public ResponseEntity<LoginResponseDto> googleLogin(@RequestBody GoogleLoginDto googleLoginDto,
+                                                        HttpServletResponse httpServletResponse) {
+
+        LoginResponseDto loginResponse = authService.googleLogin(googleLoginDto);
+
+        // Same cookie logic as your standard login
+        Cookie cookie = new Cookie("refreshToken", loginResponse.getAccessToken());
+        cookie.setHttpOnly(true);
+        httpServletResponse.addCookie(cookie);
+
+        return ResponseEntity.ok(loginResponse);
+    }
+
+    @PostMapping("/verify-email")
+    public ResponseEntity<java.util.Map<String, String>> verifyEmail(@RequestBody VerifyEmailDto verifyEmailDto) {
+
+        // 1. Verify the code
+        authService.verifyEmail(verifyEmailDto.getEmail(), verifyEmailDto.getCode());
+
+        // 2. Return a JSON object (Map) instead of a plain String
+        java.util.Map<String, String> response = new java.util.HashMap<>();
+        response.put("message", "Email successfully verified!");
+
+        return ResponseEntity.ok(response);
+    }
+
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<java.util.Map<String, String>> forgotPassword(@RequestBody ForgotPasswordDto dto) {
+        authService.forgotPassword(dto.getEmail());
+
+        java.util.Map<String, String> response = new java.util.HashMap<>();
+        // We return a generic success message even if the email wasn't found to prevent "email enumeration" attacks
+        response.put("message", "If an account exists for that email, a reset link has been sent.");
+
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<java.util.Map<String, String>> resetPassword(@RequestBody ResetPasswordDto dto) {
+        authService.resetPassword(dto.getToken(), dto.getNewPassword());
+
+        java.util.Map<String, String> response = new java.util.HashMap<>();
+        response.put("message", "Password has been successfully reset. You can now log in.");
+
+        return ResponseEntity.ok(response);
+    }
+
 }

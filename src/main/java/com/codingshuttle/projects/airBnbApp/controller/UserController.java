@@ -1,9 +1,6 @@
 package com.codingshuttle.projects.airBnbApp.controller;
 
-import com.codingshuttle.projects.airBnbApp.dto.BookingDto;
-import com.codingshuttle.projects.airBnbApp.dto.GuestDto;
-import com.codingshuttle.projects.airBnbApp.dto.ProfileUpdateRequestDto;
-import com.codingshuttle.projects.airBnbApp.dto.UserDto;
+import com.codingshuttle.projects.airBnbApp.dto.*;
 import com.codingshuttle.projects.airBnbApp.entity.User;
 import com.codingshuttle.projects.airBnbApp.service.BookingService;
 import com.codingshuttle.projects.airBnbApp.service.GuestService;
@@ -15,7 +12,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/users")
@@ -26,10 +25,13 @@ public class UserController {
     private final BookingService bookingService;
     private final GuestService guestService;
 
-    @PatchMapping("/profile")
+    @PutMapping("/profile")
     @Operation(summary = "Update the user profile", tags = {"Profile"})
-    public ResponseEntity<Void> updateProfile(@Valid @RequestBody ProfileUpdateRequestDto profileUpdateRequestDto) {
+    public ResponseEntity<Map<String, String>> updateProfile(@Valid @RequestBody ProfileUpdateRequestDto profileUpdateRequestDto) {
         userService.updateProfile(profileUpdateRequestDto);
+
+        Map<String, String> response = new HashMap<>();
+        response.put("message", "Profile updated successfully");
 
         return ResponseEntity.noContent().build();
     }
