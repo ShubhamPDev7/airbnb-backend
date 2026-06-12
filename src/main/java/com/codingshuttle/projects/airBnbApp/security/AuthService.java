@@ -52,6 +52,9 @@ public class AuthService {
     @Value("${app.google.client-id}")
     private String googleClientId;
 
+    @Value("${frontend.url}")
+    private String frontendUrl;
+
     private void generateAndSendOtp(String email) {
         // 1. Remove any old OTPs for this email to prevent clutter
         otpRepository.findTopByEmailOrderByCreatedAtDesc(email)
@@ -140,7 +143,7 @@ public class AuthService {
         String accessToken = jwtService.generateAccessToken(user);
         String refreshToken = jwtService.generateRefreshToken(user);
 
-        return new LoginResponseDto(accessToken, userDto);
+        return new LoginResponseDto(accessToken, userDto, refreshToken);
     }
 
     public String refreshToken(String refreshToken){
@@ -179,8 +182,9 @@ public class AuthService {
 
                 UserDto userDto = modelMapper.map(user, UserDto.class);
                 String accessToken = jwtService.generateAccessToken(user);
+                String refreshToken = jwtService.generateRefreshToken(user);
 
-                return new LoginResponseDto(accessToken, userDto);
+                return new LoginResponseDto(accessToken, userDto, refreshToken);
 
             } else {
                 throw new RuntimeException("Invalid Google ID token.");
@@ -211,8 +215,7 @@ public class AuthService {
         passwordResetTokenRepository.save(resetToken);
 
         // 5. Send the Magic Link email
-        // Note: We use localhost:5173 which is your React frontend port!
-        String resetLink = "http://localhost:5173/reset-password?token=" + token;
+        String resetLink = frontendUrl + "/reset-password?token=" + token;
 
         String subject = "Reset your StayLux password";
         String body = "<h3>Password Reset Request</h3>" +
