@@ -14,7 +14,11 @@ import java.util.Optional;
 
 public interface HotelMinPriceRepository extends JpaRepository<HotelMinPrice, Long> {
 
-    // 🌟 UPDATED: Added category matching logic (ILIKE equivalent in JPQL)
+    // 🌟 UPDATED: Added category matching logic, and an availability check against the
+    // Inventory table so hotels without enough free rooms for the requested roomsCount
+    // across the whole date range are excluded from results. categoryKeyword is the
+    // singular/lowercased form of category (computed in the service layer) used for
+    // LIKE matching against hotel name/city.
     @Query(value = """
         SELECT new com.codingshuttle.projects.airBnbApp.dto.HotelPriceDto(i.hotel, AVG(i.price))
         FROM HotelMinPrice i
@@ -22,8 +26,17 @@ public interface HotelMinPriceRepository extends JpaRepository<HotelMinPrice, Lo
             AND i.date BETWEEN :startDate AND :endDate
             AND i.hotel.active = true
             AND (:category IS NULL OR :category = '' OR :category = 'all' 
-                 OR LOWER(i.hotel.name) LIKE LOWER(CONCAT('%', REPLACE(:category, 's', ''), '%')) 
-                 OR LOWER(i.hotel.city) LIKE LOWER(CONCAT('%', :category, '%')))
+                 OR LOWER(i.hotel.name) LIKE CONCAT('%', :categoryKeyword, '%') 
+                 OR LOWER(i.hotel.city) LIKE CONCAT('%', :categoryKeyword, '%'))
+            AND i.hotel.id IN (
+                SELECT inv.hotel.id
+                FROM Inventory inv
+                WHERE inv.date BETWEEN :startDate AND :endDate
+                    AND inv.closed = false
+                    AND (inv.totalCount - inv.bookedCount - inv.reservedCount) >= :roomsCount
+                GROUP BY inv.hotel.id, inv.room.id
+                HAVING COUNT(inv.date) = :dateCount
+            )
         GROUP BY i.hotel
         """,
             countQuery = """
@@ -33,8 +46,17 @@ public interface HotelMinPriceRepository extends JpaRepository<HotelMinPrice, Lo
             AND i.date BETWEEN :startDate AND :endDate
             AND i.hotel.active = true
             AND (:category IS NULL OR :category = '' OR :category = 'all' 
-                 OR LOWER(i.hotel.name) LIKE LOWER(CONCAT('%', REPLACE(:category, 's', ''), '%')) 
-                 OR LOWER(i.hotel.city) LIKE LOWER(CONCAT('%', :category, '%')))
+                 OR LOWER(i.hotel.name) LIKE CONCAT('%', :categoryKeyword, '%') 
+                 OR LOWER(i.hotel.city) LIKE CONCAT('%', :categoryKeyword, '%'))
+            AND i.hotel.id IN (
+                SELECT inv.hotel.id
+                FROM Inventory inv
+                WHERE inv.date BETWEEN :startDate AND :endDate
+                    AND inv.closed = false
+                    AND (inv.totalCount - inv.bookedCount - inv.reservedCount) >= :roomsCount
+                GROUP BY inv.hotel.id, inv.room.id
+                HAVING COUNT(inv.date) = :dateCount
+            )
         """)
     Page<HotelPriceDto> findHotelsWithAvailableInventory(
             @Param("city") String city,
@@ -42,7 +64,8 @@ public interface HotelMinPriceRepository extends JpaRepository<HotelMinPrice, Lo
             @Param("endDate") LocalDate endDate,
             @Param("roomsCount") Integer roomsCount,
             @Param("dateCount") Long dateCount,
-            @Param("category") String category, // 🌟 NEW PARAMETER
+            @Param("category") String category,
+            @Param("categoryKeyword") String categoryKeyword,
             Pageable pageable
     );
 

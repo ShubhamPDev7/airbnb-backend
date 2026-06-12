@@ -33,7 +33,7 @@ public class UserController {
         Map<String, String> response = new HashMap<>();
         response.put("message", "Profile updated successfully");
 
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/myBookings")

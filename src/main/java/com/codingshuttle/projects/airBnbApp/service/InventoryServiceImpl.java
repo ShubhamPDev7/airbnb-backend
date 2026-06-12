@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import static com.codingshuttle.projects.airBnbApp.util.AppUtils.getCurrentUser;
+import static com.codingshuttle.projects.airBnbApp.util.AppUtils.toTitleCase;
 
 @Service
 @RequiredArgsConstructor
@@ -68,10 +69,7 @@ public class InventoryServiceImpl implements InventoryService{
     @Override
     public Page<HotelPriceDto> searchHotels(HotelSearchRequest hotelSearchRequest) {
         if (hotelSearchRequest.getCity() != null && !hotelSearchRequest.getCity().isEmpty()) {
-            hotelSearchRequest.setCity(
-                    hotelSearchRequest.getCity().substring(0, 1).toUpperCase() +
-                            hotelSearchRequest.getCity().substring(1).toLowerCase()
-            );
+            hotelSearchRequest.setCity(toTitleCase(hotelSearchRequest.getCity()));
         }
 
         log.info("Searching hotels for {} city, category {}, from {} to {}",
@@ -81,15 +79,33 @@ public class InventoryServiceImpl implements InventoryService{
         long dateCount =
                 ChronoUnit.DAYS.between(hotelSearchRequest.getStartDate(), hotelSearchRequest.getEndDate()) + 1;
 
+        // Default to 1 room if the client doesn't specify, so the availability check
+        // in the repository always has a sensible value to compare against.
+        Integer roomsCount = hotelSearchRequest.getRoomsCount() == null || hotelSearchRequest.getRoomsCount() < 1
+                ? 1
+                : hotelSearchRequest.getRoomsCount();
+
+        // Normalize category to a singular, lowercase keyword for matching against hotel
+        // name/city (e.g. "mountains" -> "mountain"). Only strips a single trailing 's'
+        // so categories that don't end in 's' (beach, pool, luxury, etc.) pass through untouched.
+        String categoryKeyword = hotelSearchRequest.getCategory();
+        if (categoryKeyword != null) {
+            categoryKeyword = categoryKeyword.trim().toLowerCase();
+            if (categoryKeyword.length() > 1 && categoryKeyword.endsWith("s")) {
+                categoryKeyword = categoryKeyword.substring(0, categoryKeyword.length() - 1);
+            }
+        }
+
         // 🌟 UPDATED: Pass the category into the repository method
         Page<HotelPriceDto> hotelPage =
                 hotelMinPriceRepository.findHotelsWithAvailableInventory(
                         hotelSearchRequest.getCity(),
                         hotelSearchRequest.getStartDate(),
                         hotelSearchRequest.getEndDate(),
-                        hotelSearchRequest.getRoomsCount(),
+                        roomsCount,
                         dateCount,
                         hotelSearchRequest.getCategory(),
+                        categoryKeyword,
                         pageable
                 );
 
