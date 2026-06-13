@@ -1,34 +1,53 @@
 package com.codingshuttle.projects.airBnbApp.service;
 
 import com.codingshuttle.projects.airBnbApp.entity.Booking;
-import jakarta.mail.internet.MimeMessage;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class EmailService {
 
-    private final JavaMailSender mailSender;
+    @Value("${brevo.api.key}")
+    private String apiKey;
+
+    private final HttpClient httpClient = HttpClient.newHttpClient();
 
     @Async
-    public void sendEmail(String to, String subject, String text) {
+    public void sendEmail(String to, String subject, String htmlContent) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true);
+            String body = """
+                {
+                    "sender": {"email": "shubhampawar5929@gmail.com", "name": "StayLux"},
+                    "to": [{"email": "%s"}],
+                    "subject": "%s",
+                    "htmlContent": "%s"
+                }
+                """.formatted(to, subject, htmlContent.replace("\"", "\\\"").replace("\n", ""));
 
-            helper.setTo(to);
-            helper.setSubject(subject);
-            helper.setText(text, true); // true = HTML
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create("https://api.brevo.com/v3/smtp/email"))
+                    .header("accept", "application/json")
+                    .header("api-key", apiKey)
+                    .header("content-type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(body))
+                    .build();
 
-            mailSender.send(message);
-            log.info("Email sent successfully to: {}", to);
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
+            if (response.statusCode() == 201) {
+                log.info("Email sent successfully to: {}", to);
+            } else {
+                log.error("Failed to send email to: {}, status: {}, body: {}", to, response.statusCode(), response.body());
+            }
         } catch (Exception e) {
             log.error("Failed to send email to: {}, reason: {}", to, e.getMessage());
         }
@@ -36,118 +55,46 @@ public class EmailService {
 
     @Async
     public void sendBookingConfirmationEmail(Booking booking) {
-        try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true);
-
-            helper.setTo(booking.getUser().getEmail());
-            helper.setSubject("Booking Confirmed - " + booking.getHotel().getName());
-            helper.setText(buildConfirmationEmailBody(booking), true); // true = HTML
-
-            mailSender.send(message);
-            log.info("Confirmation email sent for booking ID: {}", booking.getId());
-
-        } catch (Exception e) {
-            log.error("Failed to send confirmation email for booking ID: {}, reason: {}",
-                    booking.getId(), e.getMessage());
-        }
+        sendEmail(
+                booking.getUser().getEmail(),
+                "Booking Confirmed - " + booking.getHotel().getName(),
+                buildConfirmationEmailBody(booking)
+        );
     }
 
     @Async
     public void sendBookingCancellationEmail(Booking booking) {
-        try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true);
-
-            helper.setTo(booking.getUser().getEmail());
-            helper.setSubject("Booking Cancelled - " + booking.getHotel().getName());
-            helper.setText(buildCancellationEmailBody(booking), true);
-
-            mailSender.send(message);
-            log.info("Cancellation email sent for booking ID: {}", booking.getId());
-
-        } catch (Exception e) {
-            log.error("Failed to send cancellation email for booking ID: {}, reason: {}",
-                    booking.getId(), e.getMessage());
-        }
+        sendEmail(
+                booking.getUser().getEmail(),
+                "Booking Cancelled - " + booking.getHotel().getName(),
+                buildCancellationEmailBody(booking)
+        );
     }
 
     private String buildConfirmationEmailBody(Booking booking) {
-        return """
-                <html>
-                <body style="font-family: Arial, sans-serif; padding: 20px;">
-                    <h2 style="color: #2e7d32;">Booking Confirmed!</h2>
-                    <p>Dear <strong>%s</strong>,</p>
-                    <p>Your booking has been confirmed. Here are your details:</p>
-                    <table style="border-collapse: collapse; width: 100%%;">
-                        <tr>
-                            <td style="padding: 8px; border: 1px solid #ddd;"><strong>Hotel</strong></td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">%s</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px; border: 1px solid #ddd;"><strong>Check-in</strong></td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">%s</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px; border: 1px solid #ddd;"><strong>Check-out</strong></td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">%s</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px; border: 1px solid #ddd;"><strong>Rooms</strong></td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">%d</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px; border: 1px solid #ddd;"><strong>Total Amount</strong></td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">₹%s</td>
-                        </tr>
-                    </table>
-                    <p style="margin-top: 20px;">Thank you for choosing us. Enjoy your stay!</p>
-                </body>
-                </html>
-                """.formatted(
-                booking.getUser().getName(),
-                booking.getHotel().getName(),
-                booking.getCheckInDate(),
-                booking.getCheckOutDate(),
-                booking.getRoomsCount(),
-                booking.getAmount()
-        );
+        return "<html><body style='font-family:Arial,sans-serif;padding:20px'>"
+                + "<h2 style='color:#2e7d32'>Booking Confirmed!</h2>"
+                + "<p>Dear <strong>" + booking.getUser().getName() + "</strong>,</p>"
+                + "<p>Your booking has been confirmed.</p>"
+                + "<p><strong>Hotel:</strong> " + booking.getHotel().getName() + "</p>"
+                + "<p><strong>Check-in:</strong> " + booking.getCheckInDate() + "</p>"
+                + "<p><strong>Check-out:</strong> " + booking.getCheckOutDate() + "</p>"
+                + "<p><strong>Rooms:</strong> " + booking.getRoomsCount() + "</p>"
+                + "<p><strong>Total:</strong> ₹" + booking.getAmount() + "</p>"
+                + "<p>Thank you for choosing StayLux!</p>"
+                + "</body></html>";
     }
 
     private String buildCancellationEmailBody(Booking booking) {
-        return """
-                <html>
-                <body style="font-family: Arial, sans-serif; padding: 20px;">
-                    <h2 style="color: #c62828;">Booking Cancelled</h2>
-                    <p>Dear <strong>%s</strong>,</p>
-                    <p>Your booking has been cancelled. Here are the details:</p>
-                    <table style="border-collapse: collapse; width: 100%%;">
-                        <tr>
-                            <td style="padding: 8px; border: 1px solid #ddd;"><strong>Hotel</strong></td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">%s</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px; border: 1px solid #ddd;"><strong>Check-in</strong></td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">%s</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px; border: 1px solid #ddd;"><strong>Check-out</strong></td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">%s</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px; border: 1px solid #ddd;"><strong>Amount Refunded</strong></td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">₹%s</td>
-                        </tr>
-                    </table>
-                    <p style="margin-top: 20px;">We hope to see you again soon!</p>
-                </body>
-                </html>
-                """.formatted(
-                booking.getUser().getName(),
-                booking.getHotel().getName(),
-                booking.getCheckInDate(),
-                booking.getCheckOutDate(),
-                booking.getAmount()
-        );
+        return "<html><body style='font-family:Arial,sans-serif;padding:20px'>"
+                + "<h2 style='color:#c62828'>Booking Cancelled</h2>"
+                + "<p>Dear <strong>" + booking.getUser().getName() + "</strong>,</p>"
+                + "<p>Your booking has been cancelled.</p>"
+                + "<p><strong>Hotel:</strong> " + booking.getHotel().getName() + "</p>"
+                + "<p><strong>Check-in:</strong> " + booking.getCheckInDate() + "</p>"
+                + "<p><strong>Check-out:</strong> " + booking.getCheckOutDate() + "</p>"
+                + "<p><strong>Amount Refunded:</strong> ₹" + booking.getAmount() + "</p>"
+                + "<p>We hope to see you again soon!</p>"
+                + "</body></html>";
     }
 }
