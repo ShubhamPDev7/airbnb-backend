@@ -362,4 +362,18 @@ public class BookingServiceImpl implements BookingService {
     public boolean hasBookingExpired(Booking booking) {
         return booking.getCreatedAt().plusMinutes(10).isBefore(LocalDateTime.now());
     }
+
+
+
+    @Override
+    public BookingDto getBookingById(Long bookingId) {
+        Booking booking = bookingRepository.findById(bookingId).orElseThrow(
+                () -> new ResourceNotFoundException("Booking not found with id: " + bookingId)
+        );
+        User user = getCurrentUser();
+        if (!user.equals(booking.getUser())) {
+            throw new UnAuthorisedException("Booking does not belong to this user with id: " + user.getId());
+        }
+        return modelMapper.map(booking, BookingDto.class);
+    }
 }

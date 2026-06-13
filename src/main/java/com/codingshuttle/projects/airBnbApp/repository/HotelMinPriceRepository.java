@@ -14,11 +14,6 @@ import java.util.Optional;
 
 public interface HotelMinPriceRepository extends JpaRepository<HotelMinPrice, Long> {
 
-    // 🌟 UPDATED: Added category matching logic, and an availability check against the
-    // Inventory table so hotels without enough free rooms for the requested roomsCount
-    // across the whole date range are excluded from results. categoryKeyword is the
-    // singular/lowercased form of category (computed in the service layer) used for
-    // LIKE matching against hotel name/city.
     @Query(value = """
         SELECT new com.codingshuttle.projects.airBnbApp.dto.HotelPriceDto(i.hotel, AVG(i.price))
         FROM HotelMinPrice i

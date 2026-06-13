@@ -2,6 +2,7 @@ package com.codingshuttle.projects.airBnbApp.service;
 
 import com.codingshuttle.projects.airBnbApp.dto.*;
 import com.codingshuttle.projects.airBnbApp.entity.Hotel;
+import com.codingshuttle.projects.airBnbApp.entity.HotelMinPrice;
 import com.codingshuttle.projects.airBnbApp.entity.Inventory;
 import com.codingshuttle.projects.airBnbApp.entity.Room;
 import com.codingshuttle.projects.airBnbApp.entity.User;
@@ -22,7 +23,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static com.codingshuttle.projects.airBnbApp.util.AppUtils.getCurrentUser;
@@ -42,6 +47,7 @@ public class InventoryServiceImpl implements InventoryService{
     public void initializeRoomForAYear(Room room) {
         LocalDate today = LocalDate.now();
         LocalDate endDate = today.plusYears(1);
+        List<Inventory> newInventories = new ArrayList<>();
         for (LocalDate date = today; !date.isAfter(endDate); date = date.plusDays(1)) {
             Inventory inventory = Inventory.builder()
                     .hotel(room.getHotel())
@@ -55,8 +61,39 @@ public class InventoryServiceImpl implements InventoryService{
                     .totalCount(room.getTotalCount())
                     .closed(false)
                     .build();
-            inventoryRepository.save(inventory);
+            newInventories.add(inventory);
         }
+        inventoryRepository.saveAll(newInventories);
+
+        updateHotelMinPriceForHotel(room.getHotel(), newInventories, false);
+    }
+
+    @Override
+    public void updateHotelMinPriceForHotel(Hotel hotel, List<Inventory> inventoryList) {
+        updateHotelMinPriceForHotel(hotel, inventoryList, true);
+    }
+
+    private void updateHotelMinPriceForHotel(Hotel hotel, List<Inventory> inventoryList, boolean overwrite) {
+        Map<LocalDate, Optional<BigDecimal>> dailyMinPrices = inventoryList.stream()
+                .collect(Collectors.groupingBy(
+                        Inventory::getDate,
+                        Collectors.mapping(Inventory::getPrice, Collectors.minBy(Comparator.naturalOrder()))
+                ));
+
+        List<HotelMinPrice> hotelMinPrices = new ArrayList<>();
+        dailyMinPrices.forEach((date, priceOpt) -> {
+            BigDecimal newPrice = priceOpt.orElse(BigDecimal.ZERO);
+            HotelMinPrice hotelMinPrice = hotelMinPriceRepository
+                    .findByHotelAndDate(hotel, date)
+                    .orElse(new HotelMinPrice(hotel, date));
+
+            if (overwrite || hotelMinPrice.getPrice() == null || newPrice.compareTo(hotelMinPrice.getPrice()) < 0) {
+                hotelMinPrice.setPrice(newPrice);
+            }
+            hotelMinPrices.add(hotelMinPrice);
+        });
+
+        hotelMinPriceRepository.saveAll(hotelMinPrices);
     }
 
     @Override
@@ -79,15 +116,11 @@ public class InventoryServiceImpl implements InventoryService{
         long dateCount =
                 ChronoUnit.DAYS.between(hotelSearchRequest.getStartDate(), hotelSearchRequest.getEndDate()) + 1;
 
-        // Default to 1 room if the client doesn't specify, so the availability check
-        // in the repository always has a sensible value to compare against.
+
         Integer roomsCount = hotelSearchRequest.getRoomsCount() == null || hotelSearchRequest.getRoomsCount() < 1
                 ? 1
                 : hotelSearchRequest.getRoomsCount();
 
-        // Normalize category to a singular, lowercase keyword for matching against hotel
-        // name/city (e.g. "mountains" -> "mountain"). Only strips a single trailing 's'
-        // so categories that don't end in 's' (beach, pool, luxury, etc.) pass through untouched.
         String categoryKeyword = hotelSearchRequest.getCategory();
         if (categoryKeyword != null) {
             categoryKeyword = categoryKeyword.trim().toLowerCase();
@@ -96,7 +129,7 @@ public class InventoryServiceImpl implements InventoryService{
             }
         }
 
-        // 🌟 UPDATED: Pass the category into the repository method
+
         Page<HotelPriceDto> hotelPage =
                 hotelMinPriceRepository.findHotelsWithAvailableInventory(
                         hotelSearchRequest.getCity(),

@@ -56,21 +56,17 @@ public class AuthService {
     private String frontendUrl;
 
     private void generateAndSendOtp(String email) {
-        // 1. Remove any old OTPs for this email to prevent clutter
         otpRepository.findTopByEmailOrderByCreatedAtDesc(email)
                 .ifPresent(otpRepository::delete);
 
-        // 2. Generate a random 6-digit code
         String code = String.format("%06d", new java.util.Random().nextInt(999999));
 
-        // 3. Save it to the database
         Otp otp = new Otp();
         otp.setEmail(email);
         otp.setCode(code);
         otp.setExpiresAt(java.time.LocalDateTime.now().plusMinutes(10));
         otpRepository.save(otp);
 
-        // 4. Send the email!
         String subject = "Verify your StayLux account";
         String body = "<h3>Welcome to StayLux!</h3>" +
                 "<p>Your 6-digit verification code is: <strong>" + code + "</strong></p>" +
@@ -91,14 +87,14 @@ public class AuthService {
             throw new RuntimeException("Invalid verification code.");
         }
 
-        // Code is valid! Verify the user
+
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         user.setIsVerified(true);
         userRepository.save(user);
 
-        // Clean up the used OTP
+
         otpRepository.delete(otp);
     }
 
@@ -114,13 +110,13 @@ public class AuthService {
         newUser.setRoles(Set.of(Role.GUEST));
         newUser.setPassword(passwordEncoder.encode(signUpRequestDto.getPassword()));
 
-        // 1. Explicitly set the user as unverified
+
         newUser.setIsVerified(false);
         log.info("Saving new user: {}", newUser.getEmail());
         newUser = userRepository.save(newUser);
         log.info("User saved. Now calling generateAndSendOtp...");
 
-        // 2. Automatically generate and email the 6-digit OTP
+
         generateAndSendOtp(newUser.getEmail());
         log.info("generateAndSendOtp finished execution.");
 
@@ -197,24 +193,24 @@ public class AuthService {
 
 
     public void forgotPassword(String email) {
-        // 1. Verify the user actually exists
+
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("No account found with that email address."));
 
-        // 2. Clean up any old tokens for this email
+
         passwordResetTokenRepository.deleteByEmail(email);
 
-        // 3. Generate a secure, random UUID token
+
         String token = UUID.randomUUID().toString();
 
-        // 4. Save it to the database (valid for 15 minutes)
+
         PasswordResetToken resetToken = new PasswordResetToken();
         resetToken.setToken(token);
         resetToken.setEmail(email);
         resetToken.setExpiresAt(java.time.LocalDateTime.now().plusMinutes(15));
         passwordResetTokenRepository.save(resetToken);
 
-        // 5. Send the Magic Link email
+
         String resetLink = frontendUrl + "/reset-password?token=" + token;
 
         String subject = "Reset your StayLux password";
@@ -227,24 +223,24 @@ public class AuthService {
     }
 
     public void resetPassword(String token, String newPassword) {
-        // 1. Find the token in the database
+
         PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(token)
                 .orElseThrow(() -> new RuntimeException("Invalid or missing reset token."));
 
-        // 2. Check if it has expired
+
         if (resetToken.getExpiresAt().isBefore(java.time.LocalDateTime.now())) {
             throw new RuntimeException("This reset link has expired. Please request a new one.");
         }
 
-        // 3. Find the user associated with this token's email
+
         User user = userRepository.findByEmail(resetToken.getEmail())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found."));
 
-        // 4. Update their password
+
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
 
-        // 5. Delete the token so it cannot be used again
+
         passwordResetTokenRepository.delete(resetToken);
     }
 

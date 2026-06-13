@@ -51,4 +51,10 @@ public class HotelBookingController {
     public ResponseEntity<List<BookingDto>> getMyBookings() {
         return ResponseEntity.ok(bookingService.getMyBookings());
     }
+
+    // NEW: fetch a single booking by ID (used by Checkout page to show price breakdown)
+    @GetMapping("/{bookingId}")
+    public ResponseEntity<BookingDto> getBookingById(@PathVariable Long bookingId) {
+        return ResponseEntity.ok(bookingService.getBookingById(bookingId));
+    }
 }

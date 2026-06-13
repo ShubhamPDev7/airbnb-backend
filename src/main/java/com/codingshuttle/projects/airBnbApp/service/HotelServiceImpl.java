@@ -96,7 +96,7 @@ public class HotelServiceImpl implements HotelService{
             throw new UnAuthorisedException("This user does not own this hotel with id: "+id);
         }
 
-        // 🌟 EXPLICITLY DELETE CHILD RECORDS FIRST TO PREVENT POSTGRES CRASH
+
         hotelMinPriceRepository.deleteByHotel(hotel);
 
         for(Room room: hotel.getRooms()) {
@@ -104,7 +104,7 @@ public class HotelServiceImpl implements HotelService{
             roomRepository.deleteById(room.getId());
         }
 
-        // Now it is safe to delete the hotel itself
+
         hotelRepository.deleteById(id);
     }
 
@@ -123,7 +123,7 @@ public class HotelServiceImpl implements HotelService{
 
         hotel.setActive(true);
 
-        // assuming only do it once
+
         for(Room room: hotel.getRooms()) {
             inventoryService.initializeRoomForAYear(room);
         }

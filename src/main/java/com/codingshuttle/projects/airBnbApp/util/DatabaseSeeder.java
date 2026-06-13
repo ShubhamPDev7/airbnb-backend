@@ -31,13 +31,13 @@ public class DatabaseSeeder implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) throws Exception {
-        // 1. Safety check: Don't seed if we already have a bunch of hotels
+
         if (hotelRepository.count() >= 20) {
             log.info("Database is already populated. Skipping seeder.");
             return;
         }
 
-        // 2. Grab the first user in your database to act as the "Host"
+
         User owner = userRepository.findAll().stream().findFirst().orElse(null);
         if (owner == null) {
             log.warn("Cannot seed database: No users exist! Please register an account first.");
@@ -56,14 +56,14 @@ public class DatabaseSeeder implements CommandLineRunner {
             String city = cities[random.nextInt(cities.length)];
             String name = prefixes[random.nextInt(prefixes.length)] + " " + suffixes[random.nextInt(suffixes.length)] + " " + city;
 
-            // Create Hotel
+
             Hotel hotel = new Hotel();
             hotel.setName(name);
             hotel.setCity(city);
             hotel.setActive(true);
             hotel.setOwner(owner);
 
-            // Using our bulletproof Unsplash fallbacks
+
             String[] photos = {
                     "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=80",
                     "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=800&q=80",
@@ -76,17 +76,17 @@ public class DatabaseSeeder implements CommandLineRunner {
             String[] amenities = {"WiFi", "Air Conditioning", "Kitchen", "Free Parking", "Pool"};
             hotel.setAmenities(amenities);
 
-            // Optional: Set contact info if your Embeddable class requires it
+
             HotelContactInfo contact = new HotelContactInfo();
             contact.setAddress(random.nextInt(900) + 100 + " Main Street");
             contact.setPhoneNumber("+91 9876543" + String.format("%03d", i));
             contact.setEmail("contact@" + name.replaceAll("\\s", "").toLowerCase() + ".com");
             hotel.setContactInfo(contact);
 
-            // Save the Hotel to DB
+
             hotel = hotelRepository.save(hotel);
 
-            // Create 1 to 3 Rooms for this hotel
+
             int numRooms = random.nextInt(3) + 1;
             for (int r = 0; r < numRooms; r++) {
                 Room room = new Room();
@@ -100,11 +100,11 @@ public class DatabaseSeeder implements CommandLineRunner {
 
                 room = roomRepository.save(room);
 
-                // 🌟 Trigger your heavy business logic to generate 365 days of inventory
+
                 inventoryService.initializeRoomForAYear(room);
             }
 
-            // Trigger pricing aggregation
+
             pricingUpdateService.updatePricesForHotel(hotel);
             log.info("✅ Seeded [" + i + "/20]: " + name + " in " + city);
         }
